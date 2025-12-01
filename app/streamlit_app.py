@@ -291,6 +291,11 @@ if st.session_state.get("optimize", False):
             st.error(f"Erreur lors de la construction du modèle: {e}")
             st.stop()
 
+        
+        if solver_name not in ["highs", "appsi_highs"]:
+            from pyomo.environ import Suffix
+            model.model.dual = Suffix(direction=Suffix.IMPORT)
+
         # Résoudre
         try:
             result = model.solve(
