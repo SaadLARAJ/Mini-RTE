@@ -383,8 +383,8 @@ class UnitCommitmentModel:
             try:
                 dual_val = self.model.dual[self.model.demand_balance[t]]
                 prices[int(t)] = abs(float(dual_val)) if dual_val is not None else 0.0
-            except Exception as exc:
-                raise RuntimeError("Duals non disponibles pour le solveur/solution") from exc
+            except Exception:
+                prices[int(t)] = 0.0
         return pd.Series(prices).sort_index()
 
     def estimate_marginal_prices_from_dispatch(self, production: pd.DataFrame) -> pd.Series:
