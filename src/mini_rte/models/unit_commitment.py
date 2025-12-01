@@ -240,7 +240,9 @@ class UnitCommitmentModel:
             solver.options["mip_rel_gap"] = mip_gap
 
         logger.info("Résolution avec %s...", solver_name)
-        self.solver_result = solver.solve(self.model, tee=False)
+        self.solver_result = solver.solve(self.model, tee=False, load_solutions=False)
+        if self.solver_result.solver.termination_condition != "infeasible":
+            self.model.solutions.load_from(self.solver_result)
 
         status = str(self.solver_result.solver.status)
         termination = str(self.solver_result.solver.termination_condition)
