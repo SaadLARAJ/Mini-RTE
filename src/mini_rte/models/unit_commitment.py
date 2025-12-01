@@ -278,7 +278,10 @@ class UnitCommitmentModel:
         startup_schedule = self.get_startup_schedule()
         load_shedding = self.get_load_shedding()
         curtailment = self.get_curtailment()
-        marginal_prices = self.get_marginal_prices()
+        try:
+            marginal_prices = self.get_marginal_prices()
+        except Exception:
+            marginal_prices = self.estimate_marginal_prices_from_dispatch(production_schedule)
         co2_emissions = self.compute_co2_emissions(production_schedule)
         cost_breakdown = self.get_cost_breakdown(load_shedding)
 
@@ -379,9 +382,25 @@ class UnitCommitmentModel:
         for t in self.model.T:
             try:
                 dual_val = self.model.dual[self.model.demand_balance[t]]
-            except Exception:
-                dual_val = 0.0
-            prices[int(t)] = abs(float(dual_val)) if dual_val is not None else 0.0
+                prices[int(t)] = abs(float(dual_val)) if dual_val is not None else 0.0
+            except Exception as exc:
+                raise RuntimeError("Duals non disponibles pour le solveur/solution") from exc
+        return pd.Series(prices).sort_index()
+
+    def estimate_marginal_prices_from_dispatch(self, production: pd.DataFrame) -> pd.Series:
+        """Estimation de prix marginaux via le coût marginal de la dernière centrale appelée."""
+        prices = {}
+        costs = {
+            p.name: p.cost_variable + p.emission_factor * self.co2_price for p in self.plants
+        }
+        for t in production.index:
+            running = production.loc[t]
+            active = running[running > 1e-3]
+            if active.empty:
+                prices[t] = 0.0
+            else:
+                last_cost = max(costs[name] for name in active.index)
+                prices[t] = last_cost
         return pd.Series(prices).sort_index()
 
     def compute_co2_emissions(self, production: pd.DataFrame) -> float:
