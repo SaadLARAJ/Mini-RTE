@@ -278,15 +278,18 @@ class UnitCommitmentModel:
         startup_schedule = self.get_startup_schedule()
         load_shedding = self.get_load_shedding()
         curtailment = self.get_curtailment()
-        # Par défaut, estimation via dispatch (robuste sur solveurs sans duals)
-        marginal_prices = self.estimate_marginal_prices_from_dispatch(production_schedule)
-        # Si des duals sont disponibles et non nuls, on les privilégie
+        
+        # Tenter d'obtenir les prix marginaux via les duals (méthode la plus précise)
+        # Si indisponible (cas fréquent avec les solveurs MILP gratuits), basculer sur une estimation.
         try:
             dual_prices = self.get_marginal_prices()
             if dual_prices.notna().any() and dual_prices.abs().sum() > 0:
                 marginal_prices = dual_prices
-        except Exception:
-            pass
+            else: # Les duals sont nuls ou vides, on estime
+                marginal_prices = self.estimate_marginal_prices_from_dispatch(production_schedule)
+        except Exception: # Erreur lors de l'accès aux duals
+            marginal_prices = self.estimate_marginal_prices_from_dispatch(production_schedule)
+
         co2_emissions = self.compute_co2_emissions(production_schedule)
         cost_breakdown = self.get_cost_breakdown(load_shedding)
 
