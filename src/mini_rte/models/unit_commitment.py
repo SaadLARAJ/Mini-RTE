@@ -113,7 +113,8 @@ class UnitCommitmentModel:
         """Construit le modèle Pyomo avec contraintes UC complètes."""
         model = ConcreteModel()
         self.model = model
-        model.dual = Suffix(direction=Suffix.IMPORT)
+        # Le suffixe 'dual' est ajouté dynamiquement dans streamlit_app.py
+        # pour les solveurs qui le supportent (ex: cbc), mais pas pour HiGHS.
 
         hours = list(range(len(self.demand)))
         plant_ids = list(range(len(self.plants)))
