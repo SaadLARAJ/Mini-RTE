@@ -5,6 +5,7 @@
 pyomo>=6.5.0
 pandas>=2.0.0
 numpy>=1.24.0
+highspy>=1.7.0  # Solveur HiGHS (recommandé sur Streamlit Cloud)
 
 # Visualisation
 plotly>=5.15.0
@@ -24,5 +25,5 @@ pytest-cov>=4.1.0
 # Solveurs (installer séparément selon votre système)
 # CBC: brew install cbc (macOS) ou apt-get install coinor-cbc (Linux)
 # GLPK: brew install glpk (macOS) ou apt-get install glpk-utils (Linux)
-# HiGHS: pip install highspy
+# HiGHS: inclus ici via highspy
 # Gurobi: installer depuis https://www.gurobi.com/

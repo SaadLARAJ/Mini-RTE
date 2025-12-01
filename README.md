@@ -66,7 +66,7 @@ mini-rte/
 
 ## Utilisation
 - CLI : `python main.py --config config/default_config.yaml`
-- Streamlit : `streamlit run app/streamlit_app.py` (CBC/GLPK/HiGHS/Gurobi)
+- Streamlit : `streamlit run app/streamlit_app.py` (CBC/GLPK/HiGHS/Gurobi ; sur Streamlit Cloud, sélectionner HiGHS/appsi_highs installé via highspy)
 - Prévision (optionnel) :
   1. `export ENTSOE_API_KEY="votre_cle"` ne pas oublier votre propre clé la mienne n'est pas présente.
   2. `python scripts/train_forecast.py --start 2022-01-01 --end 2023-12-31`
