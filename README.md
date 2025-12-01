@@ -14,10 +14,11 @@
 - **Data science** : clustering léger des centrales (merit order agrégé), prévision de demande baseline (RandomForest si dispo, fallback polyfit).
 
 ## Ce que ça démontre
-- Optimisation & RO : UC, rampes, VoLL, duals/prix marginal.
-- Marché énergie : merit order, ETS/CO₂, Value of Lost Load.
-- Data & viz : Plotly (mix, coûts, prix marginal, émissions), validation CSV.
-- Ingénierie : packaging Python (`mini_rte`), tests Pytest, scripts d’entraînement, Streamlit UI.
+- Optimisation & RO : UC (binaire/continu), rampes, VoLL, duals/prix marginal, écrêtement des intermittents.
+- Marché énergie : merit order, ETS/CO₂, Value of Lost Load, scénarios de stress (gaz/CO₂).
+- Data science : clustering (k-means léger) des centrales par coût marginal/puissance, prévision de charge (RandomForest ou polyfit).
+- Math/Modélisation : formulation MILP avec contraintes linéarisées (ramp-up/down), start-up borné, réserve optionnelle, pénalisation du délestage.
+- Ingénierie : packaging Python (`mini_rte`), tests Pytest, scripts de training/données, Streamlit UI.
 
 ## Architecture
 ```
@@ -49,6 +50,15 @@ mini-rte/
 - Coûts CO₂ dynamiques (`emission_factor * co2_price`), bilan d’émissions.
 - Écrêtement explicite des renouvelables, prix marginal tiré du dual d’équilibre offre/demande.
 
+### Contrainte et coût (aperçu)
+- **Objectif** : min (coût variable + fixe + démarrage + CO₂ + VoLL*délestage).
+- **Équilibre** : Σ p[i,t] + shed[t] ≥ D[t]*(1+réserve).
+- **Bornes** : u[i,t]*Pmin ≤ p[i,t] ≤ u[i,t]*Pmax.
+- **Rampes** : p[i,t] - p[i,t-1] ≤ R[i], p[i,t-1] - p[i,t] ≤ R[i].
+- **Start-up** : start ≥ u[t]-u[t-1], start ≤ u[t], start ≤ 1-u[t-1].
+- **Renouvelables** : p + curtail ≤ dispo * Pmax.
+- **Prix marginal** : dual de l’équilibre (shadow price) = signal de marché.
+
 ## Scénarios & paramètres
 - Globaux : `co2_price`, `voll`, `reserve_margin` (`config/default_config.yaml`).
 - Scénarios : low_wind, high_gas_price, nuclear_outage, summer_solar, combined_stress, low_co2, high_co2, crisis_2022, backtest_2022, backtest_2023.
@@ -58,7 +68,7 @@ mini-rte/
 - CLI : `python main.py --config config/default_config.yaml`
 - Streamlit : `streamlit run app/streamlit_app.py` (CBC/GLPK/HiGHS/Gurobi)
 - Prévision (optionnel) :
-  1. `export ENTSOE_API_KEY="votre_cle"`
+  1. `export ENTSOE_API_KEY="votre_cle"` ne pas oublier votre propre clé la mienne n'est pas présente.
   2. `python scripts/train_forecast.py --start 2022-01-01 --end 2023-12-31`
   3. Dans l’UI, cochez “Prévoir la demande”.
 
