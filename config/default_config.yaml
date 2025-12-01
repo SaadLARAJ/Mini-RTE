@@ -1,0 +1,174 @@
+# ============================================================================
+# MINI-RTE : Configuration réaliste CORRIGÉE
+# ============================================================================
+# Basée sur le mix électrique français 2024 (source: RTE)
+# CORRECTION: Hydraulique marqué is_renewable: false (pilotable)
+# ============================================================================
+
+time_horizon: 24
+time_unit: "hour"
+
+plants:
+
+  # Nucléaire - Base load
+  - name: "Nuclear_1"
+    type: "nuclear"
+    emission_factor: 0.006  # tCO2/MWh
+    p_min: 500
+    p_max: 1000
+    cost_variable: 12
+    cost_fixed: 8000
+    cost_startup: 100000
+    ramp_rate: 30
+    is_renewable: false
+
+  - name: "Nuclear_2"
+    type: "nuclear"
+    emission_factor: 0.006
+    p_min: 650
+    p_max: 1300
+    cost_variable: 11
+    cost_fixed: 10000
+    cost_startup: 150000
+    ramp_rate: 40
+    is_renewable: false
+
+  # Hydraulique - PILOTABLE (is_renewable: false)
+  - name: "Hydro_1"
+    type: "hydro"
+    emission_factor: 0.006
+    p_min: 0
+    p_max: 1500
+    cost_variable: 5
+    cost_fixed: 1000
+    cost_startup: 500
+    ramp_rate: 600
+    is_renewable: false
+
+  - name: "Hydro_2"
+    type: "hydro"
+    emission_factor: 0.006
+    p_min: 0
+    p_max: 1000
+    cost_variable: 3
+    cost_fixed: 500
+    cost_startup: 200
+    ramp_rate: 200
+    is_renewable: false
+
+  # Gaz CCGT
+  - name: "Gas_CCGT_1"
+    type: "gas"
+    emission_factor: 0.350
+    p_min: 150
+    p_max: 800
+    cost_variable: 65
+    cost_fixed: 3000
+    cost_startup: 15000
+    ramp_rate: 200
+    is_renewable: false
+
+  - name: "Gas_CCGT_2"
+    type: "gas"
+    emission_factor: 0.350
+    p_min: 120
+    p_max: 600
+    cost_variable: 68
+    cost_fixed: 2500
+    cost_startup: 12000
+    ramp_rate: 180
+    is_renewable: false
+
+  # TAC - Extrême pointe
+  - name: "TAC_Pointe"
+    type: "oil"
+    emission_factor: 0.500
+    p_min: 0
+    p_max: 500
+    cost_variable: 150
+    cost_fixed: 500
+    cost_startup: 5000
+    ramp_rate: 300
+    is_renewable: false
+
+  # Éolien - Intermittent
+  - name: "Wind_Farm_1"
+    type: "wind"
+    emission_factor: 0.0
+    p_min: 0
+    p_max: 2800
+    cost_variable: 0
+    cost_fixed: 300
+    cost_startup: 0
+    ramp_rate: 2800
+    is_renewable: true
+
+  # Solaire - Intermittent
+  - name: "Solar_Farm_1"
+    type: "solar"
+    emission_factor: 0.0
+    p_min: 0
+    p_max: 2400
+    cost_variable: 0
+    cost_fixed: 150
+    cost_startup: 0
+    ramp_rate: 2400
+    is_renewable: true
+
+solver:
+  name: "appsi_highs"
+  timeout: 300
+  mip_gap: 0.01
+  threads: 0
+  log_level: "INFO"
+
+scenarios:
+  winter_peak:
+    demand_factor: 1.15
+    wind_availability_factor: 0.6
+    solar_availability_factor: 0.3
+
+  dunkelflaute:
+    wind_availability_factor: 0.1
+    solar_availability_factor: 0.1
+
+  summer_solar:
+    demand_factor: 0.7
+    solar_availability_factor: 1.3
+    wind_availability_factor: 0.5
+
+  nuclear_crisis:
+    nuclear_availability: 0.5
+
+  high_gas_price:
+    gas_cost_multiplier: 2.0
+
+  low_co2:
+    co2_price: 25
+    description: "Prix CO2 pré-2021"
+
+  high_co2:
+    co2_price: 100
+    description: "Prix CO2 crise 2022"
+
+  crisis_2022:
+    co2_price: 100
+    gas_cost_multiplier: 3.0
+    description: "Simulation crise énergétique 2022"
+
+  backtest_2022:
+    description: "Backtest crise 2022 (demande +10%, gaz x3, CO2=100)"
+    demand_profile: "demand_profile_2022.csv"
+    co2_price: 100
+    gas_cost_multiplier: 3.0
+
+  backtest_2023:
+    description: "Backtest 2023 (demande -5%, gaz normal)"
+    demand_profile: "demand_profile_2023.csv"
+    co2_price: 80
+    gas_cost_multiplier: 1.0
+
+global_params:
+  co2_price: 80          # €/tonne (prix ETS 2024)
+  voll: 20000            # €/MWh (Value of Lost Load)
+  reserve_margin: 0.0    # % réserve (0 par défaut)

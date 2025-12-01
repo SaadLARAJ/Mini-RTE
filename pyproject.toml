@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mini-rte"
+version = "0.1.0"
+description = "Optimiseur de Réseau Électrique - Résolution du problème d'Unit Commitment (MILP)"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "Laraj Saad", email = "saad.laraj63@gmail.com"}
+]
+keywords = ["optimization", "unit-commitment", "power-system", "milp", "pyomo"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Topic :: Scientific/Engineering :: Mathematics",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+dependencies = [
+    "pyomo>=6.5.0",
+    "pandas>=2.0.0",
+    "numpy>=1.24.0",
+    "plotly>=5.15.0",
+    "streamlit>=1.28.0",
+    "pyyaml>=6.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+
+[project.scripts]
+mini-rte = "app.streamlit_app:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+packages = ["mini_rte", "mini_rte.models"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.csv"]
+
+[tool.black]
+line-length = 100
+target-version = ['py310']
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

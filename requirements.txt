@@ -1,0 +1,28 @@
+# Dépendances principales pour mini-rte
+# Python 3.10+
+
+# Optimisation
+pyomo>=6.5.0
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Visualisation
+plotly>=5.15.0
+streamlit>=1.28.0
+
+# Configuration
+pyyaml>=6.0
+
+# Data / ML
+scikit-learn>=1.3.0
+entsoe-py>=0.6.8
+
+# Tests (optionnel)
+pytest>=7.4.0
+pytest-cov>=4.1.0
+
+# Solveurs (installer séparément selon votre système)
+# CBC: brew install cbc (macOS) ou apt-get install coinor-cbc (Linux)
+# GLPK: brew install glpk (macOS) ou apt-get install glpk-utils (Linux)
+# HiGHS: pip install highspy
+# Gurobi: installer depuis https://www.gurobi.com/
