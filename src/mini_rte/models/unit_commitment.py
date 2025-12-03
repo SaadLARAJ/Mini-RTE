@@ -37,7 +37,7 @@ EMISSION_FACTORS = {
 
 @dataclass
 class OptimizationResult:
-    """Résultat de l'optimisation UC avec indicateurs enrichis."""
+    """Résultats de l'optimisation UC."""
 
     success: bool
     objective_value: float
@@ -56,7 +56,7 @@ class OptimizationResult:
 
 
 class UnitCommitmentModel:
-    """Modèle MILP pour décider du dispatch optimal heure par heure."""
+    """Modèle MILP de dispatch horaire."""
 
     def __init__(
         self,
@@ -78,7 +78,7 @@ class UnitCommitmentModel:
 
         self._validate_inputs()
         logger.info(
-            "Modèle initialisé avec %s centrales, %s heures, CO2=%s €/t, VoLL=%s €/MWh",
+            "Init modèle: %s centrales, %s heures, CO2=%s, VoLL=%s",
             len(plants),
             len(demand),
             co2_price,
@@ -87,17 +87,17 @@ class UnitCommitmentModel:
 
     def _validate_inputs(self) -> None:
         if len(self.plants) == 0:
-            raise ValueError("Au moins une centrale est requise")
+            raise ValueError("Aucune centrale définie")
         if len(self.demand) == 0:
-            raise ValueError("La demande ne peut pas être vide")
+            raise ValueError("Demande vide")
         if self.demand.min() < 0:
-            raise ValueError("La demande ne peut pas être négative")
+            raise ValueError("Demande négative détectée")
         if self.voll <= 0:
-            raise ValueError("La valeur de VoLL doit être positive")
+            raise ValueError("VoLL doit être positive")
         if self.co2_price < 0:
-            raise ValueError("Le prix du CO2 doit être positif")
+            raise ValueError("Prix CO2 négatif")
         if self.reserve_margin < 0:
-            raise ValueError("La marge de réserve doit être positive ou nulle")
+            raise ValueError("Marge de réserve négative")
 
         renewable_plants = [p for p in self.plants if p.is_renewable]
         if renewable_plants and not self.availability.empty:
@@ -105,36 +105,29 @@ class UnitCommitmentModel:
             missing = set(renewable_names) - set(self.availability.columns)
             if missing:
                 logger.warning(
-                    "Pas de disponibilité pour %s, elles seront traitées comme pilotables",
+                    "Disponibilité manquante pour %s (traitées comme pilotables)",
                     missing,
                 )
 
     def build_model(self) -> ConcreteModel:
-        """Construit le modèle Pyomo avec contraintes UC complètes."""
+        """Construction du modèle Pyomo (variables, objectif, contraintes)."""
         model = ConcreteModel()
         self.model = model
-        # Le suffixe 'dual' est ajouté dynamiquement dans streamlit_app.py
-        # pour les solveurs qui le supportent (ex: cbc), mais pas pour HiGHS.
 
         hours = list(range(len(self.demand)))
         plant_ids = list(range(len(self.plants)))
 
-        model.I = Set(initialize=plant_ids, doc="Ensemble des centrales")
-        model.T = Set(initialize=hours, doc="Ensemble des heures")
+        model.I = Set(initialize=plant_ids)
+        model.T = Set(initialize=hours)
         model.I_renew = Set(
-            initialize=[i for i, p in enumerate(self.plants) if p.is_renewable],
-            doc="Centrales renouvelables",
+            initialize=[i for i, p in enumerate(self.plants) if p.is_renewable]
         )
 
-        model.u = Var(model.I, model.T, domain=Binary, doc="État on/off de la centrale")
-        model.p = Var(
-            model.I, model.T, domain=NonNegativeReals, doc="Puissance produite (MW)"
-        )
-        model.start = Var(model.I, model.T, domain=Binary, doc="Indicateur démarrage")
-        model.shed = Var(model.T, within=NonNegativeReals, doc="Délestage (MW)")
-        model.curtail = Var(
-            model.I_renew, model.T, within=NonNegativeReals, doc="Écrêtement (MW)"
-        )
+        model.u = Var(model.I, model.T, domain=Binary, doc="Commitment")
+        model.p = Var(model.I, model.T, domain=NonNegativeReals, doc="Production (MW)")
+        model.start = Var(model.I, model.T, domain=Binary, doc="Startup")
+        model.shed = Var(model.T, within=NonNegativeReals, doc="Load Shedding")
+        model.curtail = Var(model.I_renew, model.T, within=NonNegativeReals, doc="Curtailment")
 
         def objective_rule(m):
             cost_var = sum(
@@ -211,24 +204,21 @@ class UnitCommitmentModel:
 
         model.renewable_limit = Constraint(model.I_renew, model.T, rule=renewable_balance)
 
-        logger.info("Modèle Pyomo construit avec succès")
+        logger.info("Modèle construit")
         return model
 
     def solve(
         self, solver_name: str = "cbc", timeout: int = 300, mip_gap: float = 0.01
     ) -> OptimizationResult:
-        """Résout le modèle et extrait les indicateurs principaux."""
+        """Exécute la résolution du modèle."""
         if self.model is None:
-            raise ValueError("Le modèle doit être construit avant d'être résolu")
+            raise ValueError("Modèle non construit")
 
         from pyomo.opt import SolverFactory
 
         solver = SolverFactory(solver_name)
         if solver is None or not solver.available():
-            raise ValueError(
-                f"Solveur '{solver_name}' non disponible. "
-                f"Vérifiez son installation."
-            )
+            raise ValueError(f"Solveur '{solver_name}' indisponible")
 
         if solver_name == "cbc":
             solver.options["seconds"] = timeout
@@ -240,7 +230,7 @@ class UnitCommitmentModel:
             solver.options["time_limit"] = timeout
             solver.options["mip_rel_gap"] = mip_gap
 
-        logger.info("Résolution avec %s...", solver_name)
+        logger.info("Résolution (%s)...", solver_name)
         self.solver_result = solver.solve(self.model, tee=False, load_solutions=False)
         if self.solver_result.solver.termination_condition != "infeasible":
             self.model.solutions.load_from(self.solver_result)
@@ -312,9 +302,8 @@ class UnitCommitmentModel:
         )
 
     def get_production_schedule(self) -> pd.DataFrame:
-        """Retourne la production par centrale et par heure."""
         if self.model is None:
-            raise ValueError("Le modèle doit être résolu avant d'extraire les résultats")
+            raise ValueError("Modèle non résolu")
 
         hours = list(range(len(self.demand)))
         plant_names = [p.name for p in self.plants]
@@ -328,9 +317,8 @@ class UnitCommitmentModel:
         return schedule
 
     def get_commitment_schedule(self) -> pd.DataFrame:
-        """Retourne l'état ON/OFF par centrale et par heure."""
         if self.model is None:
-            raise ValueError("Le modèle doit être résolu avant d'extraire les résultats")
+            raise ValueError("Modèle non résolu")
 
         hours = list(range(len(self.demand)))
         plant_names = [p.name for p in self.plants]
@@ -343,9 +331,8 @@ class UnitCommitmentModel:
         return schedule
 
     def get_startup_schedule(self) -> pd.DataFrame:
-        """Retourne les démarrages par centrale et par heure."""
         if self.model is None:
-            raise ValueError("Le modèle doit être résolu avant d'extraire les résultats")
+            raise ValueError("Modèle non résolu")
 
         hours = list(range(len(self.demand)))
         plant_names = [p.name for p in self.plants]
@@ -358,18 +345,16 @@ class UnitCommitmentModel:
         return schedule
 
     def get_load_shedding(self) -> pd.Series:
-        """Retourne le délestage par heure."""
         if self.model is None:
-            raise ValueError("Le modèle doit être résolu avant d'extraire les résultats")
+            raise ValueError("Modèle non résolu")
         hours = list(range(len(self.demand)))
         return pd.Series(
             [float(value(self.model.shed[t]) or 0.0) for t in hours], index=hours, name="shed_mw"
         )
 
     def get_curtailment(self) -> pd.DataFrame:
-        """Retourne l'écrêtement par centrale renouvelable et heure."""
         if self.model is None:
-            raise ValueError("Le modèle doit être résolu avant d'extraire les résultats")
+            raise ValueError("Modèle non résolu")
         hours = list(range(len(self.demand)))
         renew_indices = list(self.model.I_renew.data())
         if not renew_indices:
@@ -384,9 +369,9 @@ class UnitCommitmentModel:
         return curtail
 
     def get_marginal_prices(self) -> pd.Series:
-        """Extrait le prix marginal (shadow price) de l'équilibre offre/demande."""
+        """Extraction des variables duales (shadow prices)."""
         if self.model is None:
-            raise ValueError("Le modèle doit être résolu avant d'extraire les résultats")
+            raise ValueError("Modèle non résolu")
         prices: Dict[int, float] = {}
         for t in self.model.T:
             try:
@@ -397,7 +382,7 @@ class UnitCommitmentModel:
         return pd.Series(prices).sort_index()
 
     def estimate_marginal_prices_from_dispatch(self, production: pd.DataFrame) -> pd.Series:
-        """Estimation de prix marginaux via le coût marginal de la dernière centrale appelée."""
+        """Estimation heuristique des prix marginaux (coût marginal dernière centrale)."""
         prices = {}
         costs = {
             p.name: p.cost_variable + p.emission_factor * self.co2_price for p in self.plants
@@ -413,7 +398,6 @@ class UnitCommitmentModel:
         return pd.Series(prices).sort_index()
 
     def compute_co2_emissions(self, production: pd.DataFrame) -> float:
-        """Calcule les émissions totales de CO2 (t)."""
         emissions = 0.0
         for plant in self.plants:
             if plant.name in production.columns:
@@ -421,9 +405,8 @@ class UnitCommitmentModel:
         return emissions
 
     def get_cost_breakdown(self, load_shedding: Optional[pd.Series] = None) -> Dict[str, float]:
-        """Décompose les coûts totaux (variable, CO2, fixes, démarrage, délestage)."""
         if self.model is None:
-            raise ValueError("Le modèle doit être résolu avant d'extraire les résultats")
+            raise ValueError("Modèle non résolu")
 
         cost_var = 0.0
         cost_co2 = 0.0

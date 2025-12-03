@@ -11,7 +11,6 @@ import streamlit as st
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
-# Ajouter le répertoire src au path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root / "src"))
 
@@ -106,11 +105,9 @@ def plot_co2_emissions(result, plants) -> go.Figure:
     fig.update_layout(title="🌍 Émissions CO2 par filière")
     return fig
 
-# Configuration du logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Configuration de la page Streamlit
 st.set_page_config(
     page_title="mini-rte - Optimiseur de Réseau Électrique",
     page_icon="⚡",
@@ -118,7 +115,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# Titre principal
 st.title("⚡ mini-rte - Optimiseur de Réseau Électrique")
 st.markdown(
     """
@@ -128,10 +124,8 @@ st.markdown(
     """
 )
 
-# Sidebar - Paramètres
-st.sidebar.header("⚙️ Paramètres de Configuration")
+st.sidebar.header("⚙️ Configuration")
 
-# Chargement de la configuration
 config_path = project_root / "config" / "default_config.yaml"
 data_dir = project_root / "data"
 
@@ -142,13 +136,12 @@ try:
     solver_config = ConfigLoader.load_solver_config(config)
     global_params = ConfigLoader.load_global_params(config)
 except Exception as e:
-    st.error(f"Erreur lors du chargement de la configuration: {e}")
+    st.error(f"Erreur chargement config: {e}")
     st.stop()
 
-# Sélection du solveur
 available_solvers = SolverManager.list_available_solvers()
 if not available_solvers:
-    st.error("Aucun solveur disponible. Veuillez installer CBC, GLPK ou HiGHS.")
+    st.error("Aucun solveur disponible (CBC, GLPK, HiGHS).")
     st.stop()
 
 solver_name = st.sidebar.selectbox(
@@ -157,13 +150,9 @@ solver_name = st.sidebar.selectbox(
     index=0 if "cbc" in available_solvers else 0,
 )
 
-# Timeout
-timeout = st.sidebar.slider("Timeout (secondes)", 60, 600, solver_config.timeout, 30)
+timeout = st.sidebar.slider("Timeout (s)", 60, 600, solver_config.timeout, 30)
+mip_gap = st.sidebar.slider("Gap optimalité (%)", 0.1, 5.0, solver_config.mip_gap * 100, 0.1) / 100
 
-# Gap d'optimalité
-mip_gap = st.sidebar.slider("Gap d'optimalité (%)", 0.1, 5.0, solver_config.mip_gap * 100, 0.1) / 100
-
-# Scénarios
 st.sidebar.header("📊 Scénarios")
 
 scenario_mode = st.sidebar.radio(
@@ -199,7 +188,6 @@ elif scenario_mode == "Paramètres personnalisés":
     )
     scenario_mods = custom_modifications
 
-# Marché carbone
 st.sidebar.markdown("---")
 st.sidebar.subheader("💨 Marché carbone")
 co2_price = st.sidebar.slider(
@@ -217,18 +205,16 @@ st.sidebar.caption(f"→ Coût gaz avec CO2: {gas_effective:.0f} €/MWh")
 
 st.sidebar.markdown("---")
 use_forecast = st.sidebar.checkbox(
-    "Prévoir la demande (baseline ML)",
+    "Prévoir la demande (ML)",
     value=False,
-    help="Utilise RandomForest si disponible, sinon régression polynomiale simple.",
+    help="Utilise RandomForest si disponible, sinon régression polynomiale.",
 )
 
-# Bouton d'optimisation
 if st.sidebar.button("🚀 Optimiser", type="primary", use_container_width=True):
     st.session_state["optimize"] = True
 else:
     st.session_state["optimize"] = False
 
-# Corps principal
 if st.session_state.get("optimize", False):
     demand_forecast_plot = None
     with st.spinner("Chargement des données..."):
@@ -239,16 +225,14 @@ if st.session_state.get("optimize", False):
         try:
             demand = load_demand(demand_path)
         except Exception as e:
-            st.error(f"Erreur lors du chargement de la demande: {e}")
+            st.error(f"Erreur chargement demande: {e}")
             st.stop()
 
-        # Charger la disponibilité des renouvelables
         renewable_names = [p.name for p in plants if p.is_renewable]
         availability = pd.DataFrame()
         if renewable_names:
             availability = load_all_availability(data_dir, renewable_names)
 
-        # Appliquer les modifications de scénario
         modified_plants = plants
         modified_availability = availability
         co2_price_active = co2_price
@@ -262,20 +246,19 @@ if st.session_state.get("optimize", False):
             )
             co2_price_active = scenario_mods.get("co2_price", co2_price_active)
             if scenario_mods.get("demand_profile"):
-                st.sidebar.info(f"Profil de demande utilisé: {scenario_mods['demand_profile']}")
+                st.sidebar.info(f"Profil de demande: {scenario_mods['demand_profile']}")
 
         if use_forecast:
             try:
                 forecasted = forecast_demand(demand, horizon=len(demand), method="auto")
-                forecasted.index = demand.index  # aligner pour affichage
-                st.sidebar.success("Prévision ML appliquée à la demande.")
+                forecasted.index = demand.index
+                st.sidebar.success("Prévision ML appliquée.")
                 demand_forecast_plot = plot_forecast_vs_actual(demand, forecasted)
                 demand = forecasted
-            except Exception as e:  # pragma: no cover - UX
+            except Exception as e:
                 st.sidebar.warning(f"Prévision ML indisponible: {e}")
 
-    with st.spinner("Construction et résolution du modèle..."):
-        # Créer le modèle
+    with st.spinner("Résolution du modèle..."):
         model = UnitCommitmentModel(
             plants=modified_plants,
             demand=demand,
@@ -288,7 +271,7 @@ if st.session_state.get("optimize", False):
         try:
             model.build_model()
         except Exception as e:
-            st.error(f"Erreur lors de la construction du modèle: {e}")
+            st.error(f"Erreur construction modèle: {e}")
             st.stop()
 
         
@@ -296,7 +279,6 @@ if st.session_state.get("optimize", False):
             from pyomo.environ import Suffix
             model.model.dual = Suffix(direction=Suffix.IMPORT)
 
-        # Résoudre
         try:
             result = model.solve(
                 solver_name=solver_name, timeout=timeout, mip_gap=mip_gap
@@ -307,22 +289,18 @@ if st.session_state.get("optimize", False):
                 st.error(
                     f"❌ **Solveur non disponible**\n\n"
                     f"{error_msg}\n\n"
-                    f"**Solution :** Installez le solveur {solver_name}.\n\n"
-                    f"- **macOS** : `brew install cbc` (pour CBC)\n"
-                    f"- **Linux** : `sudo apt-get install coinor-cbc`\n"
-                    f"- **Windows** : Utilisez conda ou téléchargez depuis COIN-OR"
+                    f"Installez le solveur {solver_name} (CBC, GLPK ou HiGHS)."
                 )
             else:
-                st.error(f"❌ **Erreur lors de la résolution**\n\n{error_msg}")
+                st.error(f"❌ **Erreur résolution**\n\n{error_msg}")
             st.stop()
         except Exception as e:
             st.error(f"❌ **Erreur inattendue**\n\n{str(e)}")
             import traceback
-            with st.expander("Détails techniques"):
+            with st.expander("Détails"):
                 st.code(traceback.format_exc())
             st.stop()
 
-    # Affichage des résultats
     if result.success:
         st.success(f"✅ Optimisation réussie ! Coût total: **{result.objective_value:,.2f} €**")
 
@@ -356,7 +334,6 @@ if st.session_state.get("optimize", False):
                 """
             )
 
-        # Graphiques
         st.header("📈 Visualisations")
         hours = demand.index
 
@@ -445,10 +422,8 @@ if st.session_state.get("optimize", False):
         st.error(f"❌ Échec de l'optimisation: {result.status}")
 
 else:
-    # Page d'accueil
     st.info("👈 Configurez les paramètres dans la barre latérale et cliquez sur 'Optimiser' pour lancer l'optimisation.")
 
-    # Aperçu de la configuration
     st.header("📋 Aperçu de la Configuration")
 
     col1, col2 = st.columns(2)

@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mini-rte"
 version = "0.1.0"
-description = "Optimiseur de Réseau Électrique - Résolution du problème d'Unit Commitment (MILP)"
+description = "Simulateur d'optimisation de dispatch électrique (Unit Commitment) via MILP"
 readme = "README.md"
 requires-python = ">=3.10"
 authors = [
